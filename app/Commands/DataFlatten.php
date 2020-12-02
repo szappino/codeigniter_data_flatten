@@ -30,16 +30,61 @@ class DataFlatten extends BaseCommand
             exit;
         }        
 
-        $user_exams = new UserExam;
-        $ids = $user_exams->get_all_exams_ids();
-        
+        //Initialize Model objects
+        $user_exams = new UserExam;                
         $ex = new Exam;
-     
+        
+        //Initialize data
         $exam_name = '';
         $total = $completed = $failed = null;
         $execution_times = [];
 
+        //No exams in the period specified, exit
+        if (count( $user_exams->get_exams_for_month($period->format('Y-m-d'))) <= 0) {
+            CLI::write(CLI::color("No exams for the specified period.", 'yellow'));
+            exit;
+        }
+
+        $ids = $ex->get_all_exams_ids();
+
         //Perform operation for every exam type
+        foreach ($ids as $id) {  
+            //Get exams ids
+            $exam_name = $ex->get_exam_name($id);
+
+            foreach ($user_exams->get_exams_for_month($period->format('Y-m-d')) as $exam) {
+
+                ($exam['done'] == 1) ? $completed += 1 : $failed += 1;
+                $total += 1;
+
+                $time = $exam['timing'] - $exam['timing_remain'];
+                array_push($execution_times, $time);
+            }
+
+            $average_execution_time = array_sum($execution_times) / count($execution_times);
+                
+            //Insert data in the appropriate table 
+            $d_f = new FlattenedData;
+            $d_f->insert([
+                'period' => $period->format('Y-m-d'),
+                'type' => $exam_name,
+                'tot_simulation_done' => $total,
+                'tot_simulation_finished' => $completed,
+                'tot_simulation_undone' => $failed,
+                'timing_for_do' => $average_execution_time,
+            ]);
+
+            //Reset for next exam type
+            $exam_name = '';
+            $total = $completed = $failed = 0;
+            $execution_times = [];
+        }
+
+
+
+
+        //Perform operation for every exam type
+        /*
         foreach ($ids as $id) {          
             
             //For each exam from the current type
@@ -83,6 +128,7 @@ class DataFlatten extends BaseCommand
             $execution_times = [];
 
         }
+        */
         
         
     }
